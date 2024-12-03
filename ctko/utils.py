@@ -1,3 +1,4 @@
+import gc
 from pathlib import Path
 from typing import List, Tuple
 
@@ -26,8 +27,6 @@ def load_video_as_array(mp4_path: Path, chunk_size: int) -> np.ndarray:
         ret, frame = cap.read()
         if not ret:
             break
-        # Convert frame to RGB (OpenCV loads in BGR by default)
-        # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         frames.append(frame[:, :, 0])
 
         if n_frames == chunk_size:
@@ -37,6 +36,11 @@ def load_video_as_array(mp4_path: Path, chunk_size: int) -> np.ndarray:
     cap.release()
 
     return np.array(frames)
+
+
+def diff_tensor(tensor: np.ndarray) -> np.ndarray:
+    assert tensor.ndim == 3, "tensor must be 3D"
+    return np.abs(np.diff(tensor, axis=0)).sum((1, 2))
 
 
 def moving_average(arr: np.ndarray, window: int) -> np.ndarray:
@@ -88,7 +92,7 @@ def process_video_in_chunks(
             )
 
         # Compute the diffed vector
-        diffed = np.diff(binarised, axis=0).sum((1, 2))
+        diffed = diff_tensor(binarised)
         full_diffed_vector.extend(diffed)
 
         # Store the last frame of this chunk for continuity in the next iteration
@@ -115,21 +119,23 @@ def process_multiple_videos(mp4_paths: list[Path], chunk_size: int) -> np.ndarra
     previous_video_last_frame = None
 
     for mp4_path in mp4_paths:
+        gc.collect()
+
+        print(f"Processing {mp4_path}")
         diffed, first_frame, last_frame = process_video_in_chunks(mp4_path, chunk_size)
 
         # If there's a previous video, compute diff between last frame of previous and first of current
         if previous_video_last_frame is not None:
             # Binarise the first frame of the current video
             # Compute diff between last frame of the previous video and first frame of the current
-            inter_diff = np.diff(
+            inter_diff = diff_tensor(
                 np.vstack(
                     [
                         previous_video_last_frame[np.newaxis, ...],
                         first_frame[np.newaxis, ...],
                     ]
-                ),
-                axis=0,
-            ).sum((1, 2))
+                )
+            )
             full_diffed_vector.extend(inter_diff)
 
         # Append the current video's diffed vector
@@ -137,3 +143,12 @@ def process_multiple_videos(mp4_paths: list[Path], chunk_size: int) -> np.ndarra
         previous_video_last_frame = last_frame
 
     return np.array(full_diffed_vector)
+
+
+def array_seconds_to_minute_second(seconds: np.ndarray) -> np.ndarray:
+    # Vectorized conversion for efficiency
+    minutes = seconds // 60
+    remaining_seconds = seconds % 60
+    return np.array(
+        [f"{int(m)}:{int(s):02}" for m, s in zip(minutes, remaining_seconds)], dtype=str
+    )
