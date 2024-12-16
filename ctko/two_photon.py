@@ -4,7 +4,7 @@ from typing import Dict, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
 
-from gsheets_importer import gsheet2df
+from ctko.gsheets_importer import gsheet2df
 
 TIFF_UMBRELLA = Path("/Volumes/MarcBusche/James/Regular2p")
 
@@ -18,16 +18,17 @@ def subtract_neuropil(f_raw: np.ndarray, f_neu: np.ndarray) -> np.ndarray:
     return f_raw - f_neu * 0.7
 
 
-def load_data(mouse: str, date: str) -> Tuple[np.ndarray, np.ndarray]:
+def load_data(mouse: str, date: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     s2p_path = TIFF_UMBRELLA / date / mouse / "suite2p" / "plane0"
     cascade_result = np.load(s2p_path / "cascade_results.npy")
-    # cascade_noise = np.load(s2p_path / "noise_levels_cascade.npy")
+    noise_level_cascade = np.load(s2p_path / "noise_levels_cascade.npy")
+
     iscell = np.load(s2p_path / "iscell.npy")[:, 0].astype(bool)
     spks = np.load(s2p_path / "spks.npy")[iscell, :]
     f_raw = np.load(s2p_path / "F.npy")[iscell, :]
     f_neu = np.load(s2p_path / "Fneu.npy")[iscell, :]
     dff = compute_dff(subtract_neuropil(f_raw, f_neu))
-    return dff, cascade_result
+    return dff, cascade_result, noise_level_cascade
 
 
 def process_session(mouse: str, date: str) -> float:

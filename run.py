@@ -1,3 +1,3 @@
-from ctko.video_processor import main
+from ctko.two_photon_processor import main
 
 main()

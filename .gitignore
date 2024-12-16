@@ -1,5 +1,6 @@
 .DS_Store
 
+figures/
 token.pickle
 credentials.json
 *.npy

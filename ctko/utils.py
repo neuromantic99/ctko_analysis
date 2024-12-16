@@ -2,6 +2,7 @@ import gc
 from pathlib import Path
 from typing import List, Tuple
 
+from matplotlib import pyplot as plt
 import numpy as np
 import cv2
 
@@ -39,6 +40,7 @@ def load_video_as_array(mp4_path: Path, chunk_size: int) -> np.ndarray:
 
 
 def diff_tensor(tensor: np.ndarray) -> np.ndarray:
+    assert tensor.shape[1] == tensor.shape[2] == 400, "Video not cropped"
     assert tensor.ndim == 3, "tensor must be 3D"
     return np.abs(np.diff(tensor, axis=0)).sum((1, 2))
 
@@ -48,7 +50,7 @@ def moving_average(arr: np.ndarray, window: int) -> np.ndarray:
 
 
 def process_video_in_chunks(
-    mp4_path: Path, chunk_size: int
+    mp4_path: Path, chunk_size: int, face_corners: Tuple, binarise_value: int
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Processes a video file in chunks and computes a 1D diffed vector for the entire video.
@@ -64,15 +66,18 @@ def process_video_in_chunks(
     full_diffed_vector = []
     previous_chunk_last_frame = None  # To store the last frame of the previous chunk
     first_frame = None
+    top_left, bottom_right = face_corners
 
     while True:
+
+        gc.collect()
         frames = []
         for _ in range(chunk_size):
             ret, frame = cap.read()
             if not ret:
                 break
             frames.append(
-                frame[:, :, 0]
+                frame[top_left[0] : bottom_right[0], top_left[1] : bottom_right[1], 0]
             )  # Extract the grayscale channel (assume it's the first channel)
 
         if not frames:  # Break the loop if no frames were read
@@ -81,7 +86,7 @@ def process_video_in_chunks(
         frames_array = np.array(frames)
 
         # Binarise the frames
-        binarised = (frames_array > 200).astype(int)
+        binarised = (frames_array > binarise_value).astype(int)
         if first_frame is None:
             first_frame = binarised[0, :, :]
 
@@ -103,7 +108,9 @@ def process_video_in_chunks(
     return np.array(full_diffed_vector), first_frame, previous_chunk_last_frame
 
 
-def process_multiple_videos(mp4_paths: list[Path], chunk_size: int) -> np.ndarray:
+def process_multiple_videos(
+    mp4_paths: list[Path], chunk_size: int, face_corners: Tuple, binarise_value: int
+) -> np.ndarray:
     """
     Processes multiple video files in chunks and computes a single 1D diffed vector
     for all videos, ensuring continuity between consecutive files.
@@ -115,14 +122,17 @@ def process_multiple_videos(mp4_paths: list[Path], chunk_size: int) -> np.ndarra
     Returns:
         numpy.ndarray: The concatenated diffed vector for all videos.
     """
-    full_diffed_vector: list[int] = []
+    full_diffed_vector: List[int] = []
     previous_video_last_frame = None
 
     for mp4_path in mp4_paths:
-        gc.collect()
 
         print(f"Processing {mp4_path}")
-        diffed, first_frame, last_frame = process_video_in_chunks(mp4_path, chunk_size)
+        diffed, first_frame, last_frame = process_video_in_chunks(
+            mp4_path, chunk_size, face_corners, binarise_value
+        )
+
+        gc.collect()
 
         # If there's a previous video, compute diff between last frame of previous and first of current
         if previous_video_last_frame is not None:
@@ -146,9 +156,19 @@ def process_multiple_videos(mp4_paths: list[Path], chunk_size: int) -> np.ndarra
 
 
 def array_seconds_to_minute_second(seconds: np.ndarray) -> np.ndarray:
-    # Vectorized conversion for efficiency
     minutes = seconds // 60
     remaining_seconds = seconds % 60
     return np.array(
         [f"{int(m)}:{int(s):02}" for m, s in zip(minutes, remaining_seconds)], dtype=str
     )
+
+
+x = [
+    ("J022", "2024-09-27"),
+    ("J023", "2024-09-27"),
+    ("J024", "2024-10-09"),
+    ("J025", "2024-09-27"),
+    ("J026", "2024-10-24"),
+    ("J027", "2024-10-09"),
+    ("J029", "2024-10-25"),
+]

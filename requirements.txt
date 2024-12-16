@@ -6,3 +6,4 @@ google-auth-oauthlib
 pandas
 napari[all]
 opencv-python
+seaborn
