@@ -3,6 +3,8 @@ from typing import Dict, Tuple
 
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.ndimage import uniform_filter1d
+
 
 from ctko.gsheets_importer import gsheet2df
 
@@ -14,49 +16,43 @@ def compute_dff(f: np.ndarray) -> np.ndarray:
     return (f - flu_mean) / flu_mean
 
 
+def compute_dff_with_rolling_mean(f: np.ndarray, N: int) -> np.ndarray:
+    """
+    Compute ΔF/F using a rolling mean for the fluorescence matrix.
+
+    Parameters:
+        f (np.ndarray): Fluorescence matrix (n_cells x n_frames).
+        N (int): Window size for the rolling mean.
+
+    Returns:
+        np.ndarray: ΔF/F matrix with the same shape as `f`.
+    """
+    # Compute the rolling mean along the time axis (axis=1)
+    flu_mean = uniform_filter1d(f, size=N, axis=1, mode="reflect")
+    # Compute ΔF/F
+    return (f - flu_mean) / flu_mean
+
+
 def subtract_neuropil(f_raw: np.ndarray, f_neu: np.ndarray) -> np.ndarray:
     return f_raw - f_neu * 0.7
 
 
-def load_data(mouse: str, date: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def load_data(
+    mouse: str, date: str
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
     s2p_path = TIFF_UMBRELLA / date / mouse / "suite2p" / "plane0"
-    cascade_result = np.load(s2p_path / "cascade_results.npy")
-    noise_level_cascade = np.load(s2p_path / "noise_levels_cascade.npy")
+
+    ops = np.load(s2p_path / "ops.npy", allow_pickle=True).item()
+    average_movement = np.mean(np.abs(ops["xoff"]) + np.abs(ops["yoff"]))
 
     iscell = np.load(s2p_path / "iscell.npy")[:, 0].astype(bool)
     spks = np.load(s2p_path / "spks.npy")[iscell, :]
     f_raw = np.load(s2p_path / "F.npy")[iscell, :]
     f_neu = np.load(s2p_path / "Fneu.npy")[iscell, :]
-    dff = compute_dff(subtract_neuropil(f_raw, f_neu))
-    return dff, cascade_result, noise_level_cascade
 
+    dff = compute_dff_with_rolling_mean(subtract_neuropil(f_raw, f_neu), 30 * 30)
 
-def process_session(mouse: str, date: str) -> float:
-    dff, deconv = load_data(mouse, date)
-    nan_frames = np.sum(np.isnan(deconv[0, :]))
-    length_seconds = (deconv.shape[1] - nan_frames) / 30
-    return np.nansum(deconv, 1) / length_seconds
+    cascade_result = np.load(s2p_path / "cascade_results_running_mean_not_zeroed.npy")
+    noise_level_cascade = np.load(s2p_path / "noise_levels_cascade_running_mean.npy")
 
-    # plt.figure()
-    # plt.plot(dff[0, :])
-    # plt.plot(deconv[0, :])
-    # plt.show()
-
-
-if __name__ == "__main__":
-
-    metadata = gsheet2df("1NZi5kRUMJMPte7jeRmqFrYJIPbUPMDZ_Yq4lWE2ql1k", "Sheet1", 1)
-    metadata = metadata[metadata["Suite2p clicked"] == "DONE"]
-
-    rates: Dict[str, float] = {}
-    for idx, row in metadata.iterrows():
-        mouse = row["Mouse"]
-        date = row["Date"]
-        print(f"Processing {mouse} {date}")
-        try:
-            rate = process_session(mouse, date)
-            rates[mouse] = rate
-        except Exception as e:
-            print(f"Error occured for: {mouse} {date}. Error: {e}")
-
-    1 / 0
+    return dff, cascade_result, noise_level_cascade, average_movement

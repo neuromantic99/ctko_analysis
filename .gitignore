@@ -1,4 +1,7 @@
 .DS_Store
+data_for_sam/
+*.zip
+*.png
 
 figures/
 token.pickle

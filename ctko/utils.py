@@ -40,7 +40,7 @@ def load_video_as_array(mp4_path: Path, chunk_size: int) -> np.ndarray:
 
 
 def diff_tensor(tensor: np.ndarray) -> np.ndarray:
-    assert tensor.shape[1] == tensor.shape[2] == 400, "Video not cropped"
+    # assert tensor.shape[1] == tensor.shape[2] == 400, "Video not cropped"
     assert tensor.ndim == 3, "tensor must be 3D"
     return np.abs(np.diff(tensor, axis=0)).sum((1, 2))
 
@@ -172,3 +172,14 @@ x = [
     ("J027", "2024-10-09"),
     ("J029", "2024-10-25"),
 ]
+
+
+def normalise(signal: np.ndarray) -> np.ndarray:
+    return (signal - np.min(signal)) / (np.max(signal) - np.min(signal))
+
+
+def threshold_detect(signal: np.ndarray, threshold: float) -> np.ndarray:
+    thresh_signal = signal > threshold
+    thresh_signal[1:][thresh_signal[:-1] & thresh_signal[1:]] = False
+    times = np.where(thresh_signal)
+    return times[0]
