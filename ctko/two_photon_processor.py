@@ -68,7 +68,7 @@ def process_session(mouse: str, date: str) -> None:
     dff, deconv, noise_levels, average_movement = load_data(mouse, date)
 
     # plt.figure()
-    # paper_plot(dff, deconv, mouse)
+    paper_plot(dff, deconv, mouse)
 
     diffed = np.load(HERE.parent / "cache" / f"{mouse}-{date}-diffed.npy")
     movement = moving_average(diffed, 20)
@@ -132,14 +132,14 @@ def main() -> None:
     redo = True
 
     sessions = [
-        ("J022", "2024-09-27"),
+        # ("J022", "2024-09-27"),
         ("J023", "2024-09-27"),
-        ("J025", "2024-09-27"),
-        ("J024", "2024-10-09"),
-        ("J026", "2024-10-24"),
-        ("J027", "2024-10-09"),
-        ("J028", "2024-10-24"),
-        ("J029", "2024-10-25"),
+        # ("J025", "2024-09-27"),
+        # ("J024", "2024-10-09"),
+        # ("J026", "2024-10-24"),
+        # ("J027", "2024-10-09"),
+        # ("J028", "2024-10-24"),
+        # ("J029", "2024-10-25"),
     ]
 
     for session in sessions:

@@ -46,13 +46,15 @@ def load_data(
     average_movement = np.mean(np.abs(ops["xoff"]) + np.abs(ops["yoff"]))
 
     iscell = np.load(s2p_path / "iscell.npy")[:, 0].astype(bool)
+    stat = np.load(s2p_path / "stat.npy", allow_pickle=True)[iscell]
     spks = np.load(s2p_path / "spks.npy")[iscell, :]
     f_raw = np.load(s2p_path / "F.npy")[iscell, :]
     f_neu = np.load(s2p_path / "Fneu.npy")[iscell, :]
 
     dff = compute_dff_with_rolling_mean(subtract_neuropil(f_raw, f_neu), 30 * 30)
 
-    cascade_result = np.load(s2p_path / "cascade_results_running_mean_not_zeroed.npy")
+    # cascade_result = np.load(s2p_path / "cascade_results_running_mean_not_zeroed.npy")
+    cascade_result = np.load(s2p_path / "cascade_results_not_zeroed.npy")
     noise_level_cascade = np.load(s2p_path / "noise_levels_cascade_running_mean.npy")
 
     return dff, cascade_result, noise_level_cascade, average_movement
